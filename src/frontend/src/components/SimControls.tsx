@@ -27,13 +27,21 @@ export function SimControls({ isRunning, isComplete, round, onStartGame }: SimCo
     }
   };
 
-  const canStart = !isRunning && !isComplete && !isStarting;
+  const isDisabled = isRunning || isComplete || isStarting;
 
   const statusDotClass = isComplete
     ? 'bg-accent'
     : isRunning
     ? 'bg-success animate-pulse-opacity'
     : 'bg-text-muted';
+
+  const buttonText = isStarting
+    ? 'Starting...'
+    : isRunning
+    ? 'Running...'
+    : isComplete
+    ? 'Completed'
+    : 'Start Simulation';
 
   return (
     <div className="bg-panel rounded-[20px] border border-border p-6 flex justify-between items-center gap-6">
@@ -47,15 +55,17 @@ export function SimControls({ isRunning, isComplete, round, onStartGame }: SimCo
           Round {round} / 720 ({((round / 720) * 100).toFixed(1)}% complete)
         </p>
 
-        {canStart && (
-          <button
-            onClick={handleStart}
-            disabled={isStarting}
-            className={`px-6 py-3 text-base font-semibold bg-accent text-[#001121] border-none rounded-full cursor-pointer shadow-[0_10px_30px_rgba(46,180,255,0.35)] transition-transform hover:translate-y-[-2px] ${isStarting ? 'opacity-70 cursor-not-allowed' : ''}`}
-          >
-            {isStarting ? 'Starting...' : 'Start Simulation'}
-          </button>
-        )}
+        <button
+          onClick={handleStart}
+          disabled={isDisabled}
+          className={`px-6 py-3 text-base font-semibold border-none rounded-full transition-transform ${
+            isDisabled
+              ? 'bg-text-muted/30 text-text-muted cursor-not-allowed'
+              : 'bg-accent text-[#001121] cursor-pointer shadow-[0_10px_30px_rgba(46,180,255,0.35)] hover:-translate-y-0.5'
+          }`}
+        >
+          {buttonText}
+        </button>
 
         {startMessage && (
           <span className="text-danger text-sm">
