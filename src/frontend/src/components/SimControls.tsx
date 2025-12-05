@@ -1,38 +1,32 @@
-import { useState } from 'react';
-
 interface SimControlsProps {
+  isStarting: boolean;
   isRunning: boolean;
   isComplete: boolean;
   round: number;
   onStartGame: () => Promise<{ success: boolean; message: string }>;
 }
 
-export function SimControls({ isRunning, isComplete, round, onStartGame }: SimControlsProps) {
-  const [isStarting, setIsStarting] = useState(false);
-  const [startMessage, setStartMessage] = useState<string | null>(null);
-
+export function SimControls({ isStarting, isRunning, isComplete, round, onStartGame }: SimControlsProps) {
   const statusText = isComplete
     ? 'Simulation Complete'
     : isRunning
     ? 'Simulation Running...'
+    : isStarting
+    ? 'Starting eval-platform...'
     : 'Ready to start';
 
   const handleStart = async () => {
-    setIsStarting(true);
-    setStartMessage(null);
-    const result = await onStartGame();
-    setIsStarting(false);
-    if (!result.success) {
-      setStartMessage(result.message);
-    }
+    await onStartGame();
   };
 
-  const isDisabled = isRunning || isComplete || isStarting;
+  const isDisabled = isStarting || isRunning || isComplete;
 
   const statusDotClass = isComplete
     ? 'bg-accent'
     : isRunning
     ? 'bg-success animate-pulse-opacity'
+    : isStarting
+    ? 'bg-warning animate-pulse-opacity'
     : 'bg-text-muted';
 
   const buttonText = isStarting
@@ -66,12 +60,6 @@ export function SimControls({ isRunning, isComplete, round, onStartGame }: SimCo
         >
           {buttonText}
         </button>
-
-        {startMessage && (
-          <span className="text-danger text-sm">
-            {startMessage}
-          </span>
-        )}
       </div>
     </div>
   );

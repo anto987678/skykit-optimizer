@@ -63,6 +63,7 @@ export interface GameStateSnapshot {
   round: number; // day * 24 + hour
 
   // Game status
+  isStarting: boolean;  // True while eval-platform is starting
   isRunning: boolean;
   isComplete: boolean;
 

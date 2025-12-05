@@ -63,6 +63,7 @@ export interface GameStateSnapshot {
   day: number;
   hour: number;
   round: number;
+  isStarting: boolean;
   isRunning: boolean;
   isComplete: boolean;
   stats: GameStats;

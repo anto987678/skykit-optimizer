@@ -56,6 +56,7 @@ function App() {
     day: 0,
     hour: 0,
     round: 0,
+    isStarting: false,
     isRunning: false,
     isComplete: false,
     stats: {
@@ -113,6 +114,7 @@ function App() {
         </div>
 
         <SimControls
+          isStarting={gameState.isStarting}
           isRunning={gameState.isRunning}
           isComplete={gameState.isComplete}
           round={gameState.stats.roundsCompleted}

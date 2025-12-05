@@ -28,6 +28,7 @@ let recentEvents: GameEvent[] = [];
 let recentPenalties: PenaltyInfo[] = [];
 let isGameRunning = false;
 let isGameComplete = false;
+let isGameStarting = false;  // True while eval-platform is starting
 let airportsData: Map<string, Airport> = new Map();
 
 // Express app
@@ -47,12 +48,13 @@ app.get('/api/state', (_req: Request, res: Response) => {
       day: 0,
       hour: 0,
       round: 0,
+      isStarting: isGameStarting,
       isRunning: false,
       isComplete: false,
       stats: currentStats,
       airports: [],
       activeFlights: [],
-      events: [],
+      events: recentEvents.slice(-50),
       recentPenalties: []
     } as GameStateSnapshot);
     return;
@@ -62,6 +64,7 @@ app.get('/api/state', (_req: Request, res: Response) => {
     day: currentGameState.currentDay,
     hour: currentGameState.currentHour,
     round: currentGameState.currentDay * 24 + currentGameState.currentHour,
+    isStarting: isGameStarting,
     isRunning: isGameRunning,
     isComplete: isGameComplete,
     stats: currentStats,
@@ -164,6 +167,10 @@ let startGameCallback: (() => Promise<void>) | null = null;
 
 // Start game endpoint
 app.post('/api/game/start', async (_req: Request, res: Response) => {
+  if (isGameStarting) {
+    res.status(400).json({ error: 'Game is already starting (eval-platform loading)' });
+    return;
+  }
   if (isGameRunning) {
     res.status(400).json({ error: 'Game is already running' });
     return;
@@ -173,6 +180,9 @@ app.post('/api/game/start', async (_req: Request, res: Response) => {
     return;
   }
 
+  // Mark as starting immediately
+  isGameStarting = true;
+
   // Start game in background
   res.json({ status: 'started', message: 'Game simulation started' });
 
@@ -180,6 +190,8 @@ app.post('/api/game/start', async (_req: Request, res: Response) => {
   startGameCallback().catch(err => {
     console.error('[GAME] Error:', err);
     addEvent({ type: 'warning', text: `Game error: ${err}`, timestamp: new Date().toISOString() });
+  }).finally(() => {
+    isGameStarting = false;
   });
 });
 
