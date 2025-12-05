@@ -15,7 +15,7 @@ function getDataPath(): string {
     return path.join(homeDir, 'Desktop', 'HackitAll2025', 'eval-platform', 'src', 'main', 'resources', 'liquibase', 'data');
   } else {
     // Ubuntu/Linux path
-    return path.join(homeDir, 'repos', 'hackitall2025', 'eval-platform', 'src', 'main', 'resources', 'liquibase', 'data');
+    return path.join(homeDir, 'repos', 'HackitAll2025', 'eval-platform', 'src', 'main', 'resources', 'liquibase', 'data');
   }
 }
 
