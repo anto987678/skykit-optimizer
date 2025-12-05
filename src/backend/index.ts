@@ -2,25 +2,41 @@ import { ApiClient } from './api/client';
 import { HourRequestDto, HourResponseDto } from './types';
 import { loadAircraftTypes, loadAirports, getInitialStocks, loadFlightPlan } from './data/loader';
 import { GameState } from './engine/state';
+import {
+  startServer,
+  registerGameCallback,
+  setGameState,
+  setGameRunning,
+  setGameComplete,
+  updateStats,
+  addEvent,
+  addPenalty,
+  clearState
+} from './server';
 
 const TOTAL_DAYS = 30;
 const HOURS_PER_DAY = 24;
 
-async function main() {
+// Pre-loaded data
+let aircraftTypes: ReturnType<typeof loadAircraftTypes>;
+let airports: ReturnType<typeof loadAirports>;
+let flightPlans: ReturnType<typeof loadFlightPlan>;
+
+async function runGame() {
   console.log('===========================================');
   console.log('       SkyKit Optimizer v1.0');
   console.log('   SAP Hackathon - Rotables Optimization');
   console.log('===========================================\n');
 
-  // Load static data from CSVs
-  console.log('[INIT] Loading data from CSV files...');
-  const aircraftTypes = loadAircraftTypes();
-  const airports = loadAirports();
+  // Get fresh initial stocks for this run
   const initialStocks = getInitialStocks(airports);
-  const flightPlans = loadFlightPlan();
 
   // Initialize game state with flight plan for demand forecasting
   const gameState = new GameState(initialStocks, aircraftTypes, airports, flightPlans);
+
+  // Share game state with server
+  setGameState(gameState, airports);
+  clearState();
 
   // Initialize API client
   const client = new ApiClient();
@@ -29,6 +45,8 @@ async function main() {
     // 1. Start session
     console.log('\n[GAME] Starting new session...');
     await client.startSession();
+    setGameRunning(true);
+    addEvent({ type: 'flight', text: 'Game session started', timestamp: new Date().toISOString() });
     console.log('');
 
     // 2. Game loop - 720 rounds (30 days × 24 hours)
@@ -41,10 +59,32 @@ async function main() {
     for (let day = 0; day < TOTAL_DAYS; day++) {
       for (let hour = 0; hour < HOURS_PER_DAY; hour++) {
         // CRITICAL: Process PREVIOUS round's flight events FIRST
-        // This ensures we know about CHECKED_IN flights before calculating loads
-        // Without this, we'd miss flights that transition SCHEDULED→CHECKED_IN in the current hour
         if (previousResponse) {
           gameState.processFlightUpdates(previousResponse.flightUpdates);
+
+          // Track penalties for frontend
+          for (const penalty of previousResponse.penalties) {
+            addPenalty({
+              code: penalty.code,
+              amount: penalty.penalty,
+              reason: penalty.reason,
+              flightId: penalty.flightId,
+              flightNumber: penalty.flightNumber,
+              issuedDay: penalty.issuedDay,
+              issuedHour: penalty.issuedHour
+            });
+          }
+
+          // Add flight events for frontend
+          for (const update of previousResponse.flightUpdates) {
+            if (update.eventType === 'LANDED') {
+              addEvent({
+                type: 'flight',
+                text: `Flight ${update.flightNumber} landed at ${update.destinationAirport}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          }
         }
 
         // Update game state time
@@ -52,8 +92,7 @@ async function main() {
 
         // Build request with flight loads
         const flightLoads = gameState.calculateFlightLoads();
-        // Temporarily disable purchases to test with initial stock only
-        const purchaseOrder = undefined; // gameState.calculatePurchaseOrder();
+        const purchaseOrder = gameState.calculatePurchaseOrder();
 
         const request: HourRequestDto = {
           day,
@@ -67,6 +106,15 @@ async function main() {
         lastResponse = response;
         previousResponse = response;
 
+        // Update stats for frontend
+        const roundNum = day * 24 + hour + 1;
+        updateStats({
+          totalCost: response.totalCost,
+          penaltyCost: response.penalties.reduce((sum, p) => sum + p.penalty, 0),
+          totalPenalties: response.penalties.length,
+          roundsCompleted: roundNum
+        });
+
         // Log progress every day at midnight
         if (hour === 0) {
           const costDelta = response.totalCost - lastCost;
@@ -77,30 +125,37 @@ async function main() {
         // Log penalties (limit to avoid spam)
         if (response.penalties.length > 0 && response.penalties.length <= 5) {
           for (const penalty of response.penalties) {
-            console.log(`  ⚠️  ${penalty.code}: ${penalty.penalty.toFixed(2)}`);
+            console.log(`  [PENALTY] ${penalty.code}: ${penalty.penalty.toFixed(2)}`);
           }
         } else if (response.penalties.length > 5) {
           const total = response.penalties.reduce((sum, p) => sum + p.penalty, 0);
-          console.log(`  ⚠️  ${response.penalties.length} penalties, total: ${total.toFixed(2)}`);
+          console.log(`  [PENALTIES] ${response.penalties.length} penalties, total: ${total.toFixed(2)}`);
         }
       }
     }
 
-    // Process the final round's events (important for accurate end-of-game state)
+    // Process the final round's events
     if (previousResponse) {
       gameState.processFlightUpdates(previousResponse.flightUpdates);
     }
 
-    // 3. End session (may return null if server auto-ended after round 720)
+    // 3. End session
     console.log('\n[GAME] Ending session...');
     const finalResult = await client.endSession();
+    setGameRunning(false);
+    setGameComplete(true);
 
-    // Use finalResult if available, otherwise use last response from game loop
     const result = finalResult || lastResponse;
 
     console.log('\n===========================================');
     console.log(`       FINAL SCORE: ${result?.totalCost.toFixed(2) || 'N/A'}`);
     console.log('===========================================\n');
+
+    addEvent({
+      type: 'flight',
+      text: `Game completed! Final score: ${result?.totalCost.toFixed(2) || 'N/A'}`,
+      timestamp: new Date().toISOString()
+    });
 
     // Summary of final penalties
     if (result && result.penalties.length > 0) {
@@ -122,9 +177,34 @@ async function main() {
 
   } catch (error) {
     console.error('\n[ERROR] Game failed:', error);
-    process.exit(1);
+    setGameRunning(false);
+    addEvent({
+      type: 'warning',
+      text: `Game error: ${error}`,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 
-// Run the game
+async function main() {
+  console.log('[INIT] Loading data from CSV files...');
+  aircraftTypes = loadAircraftTypes();
+  airports = loadAirports();
+  flightPlans = loadFlightPlan();
+
+  // Initialize empty game state for API
+  const initialStocks = getInitialStocks(airports);
+  const emptyGameState = new GameState(initialStocks, aircraftTypes, airports, flightPlans);
+  setGameState(emptyGameState, airports);
+
+  // Register the game callback
+  registerGameCallback(runGame);
+
+  // Start HTTP server
+  await startServer();
+
+  console.log('\n[SERVER] Ready! Use the frontend button or POST /api/game/start to begin simulation.');
+  console.log('[SERVER] Press Ctrl+C to exit.\n');
+}
+
 main().catch(console.error);

@@ -14,17 +14,33 @@
 | **FAZA 1** | ✅ DONE | Setup complet (Windows + Ubuntu cross-platform) |
 | **FAZA 2** | ✅ DONE | Core Engine implementat (`types`, `api`, `data`, `engine`) |
 | **FAZA 3** | 🔄 ~70% | Algoritm basic greedy + cumpărare - rămâne optimizare avansată |
-| **FAZA 4** | ⏳ TODO | Frontend WOW |
+| **FAZA 4** | ✅ DONE | Frontend React + Vite conectat la backend |
 | **FAZA 5** | ⏳ TODO | Pregătire Battle & Prezentare |
 
-### Fișiere implementate:
+### Structura proiect:
 ```
 src/
-├── types/index.ts     ✅ Tipuri TypeScript complete
-├── api/client.ts      ✅ API client cu startSession, playRound, endSession
-├── data/loader.ts     ✅ Data loader cross-platform (Windows + Ubuntu)
-├── engine/state.ts    ✅ GameState complet cu tracking inventar/kit-uri
-└── index.ts           ✅ Game loop principal (720 runde)
+├── backend/                    # Backend TypeScript
+│   ├── api/client.ts          ✅ API client SAP
+│   ├── data/loader.ts         ✅ Data loader cross-platform
+│   ├── engine/state.ts        ✅ GameState complet
+│   ├── types/index.ts         ✅ Tipuri TypeScript
+│   ├── server.ts              ✅ Express API server (port 3001)
+│   ├── game.ts                ✅ Game loop standalone
+│   └── index.ts               ✅ Entry point (server + game)
+├── frontend/                   # React + Vite + TypeScript
+│   └── src/
+│       ├── App.tsx            ✅ Main dashboard
+│       ├── components/        ✅ StatsGrid, InventoryPanel, EventsPanel, MapPanel
+│       └── hooks/useGameState.ts  ✅ API polling hook
+└── shared/types.ts            ✅ Tipuri partajate frontend/backend
+```
+
+### Comenzi:
+```bash
+npm run backend    # Pornește backend + game loop (port 3001)
+npm run frontend   # Pornește React dev server (port 5173)
+npm run dev        # Pornește ambele în paralel
 ```
 
 ---
