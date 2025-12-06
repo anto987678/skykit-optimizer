@@ -10,9 +10,12 @@ type Position = { x: number; y: number };
 
 export function CursorTrail() {
   const [enabled, setEnabled] = useState(false);
-  const [positions, setPositions] = useState<Position[]>(() => TRAIL_CONFIG.map(() => ({ x: -100, y: -100 })));
+  const positionsRef = useRef<Position[]>(TRAIL_CONFIG.map(() => ({ x: -100, y: -100 })));
   const targetRef = useRef<Position>({ x: -100, y: -100 });
   const rafRef = useRef<number | null>(null);
+  const dotsRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const hasPointerMovedRef = useRef(false);
+  const [hasPointerMoved, setHasPointerMoved] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -28,6 +31,10 @@ export function CursorTrail() {
 
     const handleMove = (event: PointerEvent) => {
       targetRef.current = { x: event.clientX, y: event.clientY };
+      if (!hasPointerMovedRef.current) {
+        hasPointerMovedRef.current = true;
+        setHasPointerMoved(true);
+      }
     };
 
     window.addEventListener('pointermove', handleMove);
@@ -38,15 +45,18 @@ export function CursorTrail() {
     if (!enabled) return;
 
     const animate = () => {
-      setPositions(prev =>
-        prev.map((pos, index) => {
-          const speed = 0.18 + index * 0.12;
-          return {
-            x: pos.x + (targetRef.current.x - pos.x) * speed,
-            y: pos.y + (targetRef.current.y - pos.y) * speed
-          };
-        })
-      );
+      positionsRef.current.forEach((pos, index) => {
+        const speed = 0.18 + index * 0.12;
+        pos.x += (targetRef.current.x - pos.x) * speed;
+        pos.y += (targetRef.current.y - pos.y) * speed;
+
+        const dot = dotsRef.current[index];
+        if (dot) {
+          dot.style.left = `${pos.x}px`;
+          dot.style.top = `${pos.y}px`;
+          dot.style.opacity = hasPointerMovedRef.current ? String(TRAIL_CONFIG[index].opacity) : '0';
+        }
+      });
       rafRef.current = requestAnimationFrame(animate);
     };
 
@@ -64,25 +74,26 @@ export function CursorTrail() {
 
   return (
     <div className="cursor-trail-layer">
-      {positions.map((pos, index) => {
-        const config = TRAIL_CONFIG[index];
-        const visible = pos.x !== -100;
-        return (
-          <span
-            key={index}
-            className={`cursor-trail-dot ${visible ? 'visible' : ''}`}
-            style={{
-              width: config.size,
-              height: config.size,
-              left: pos.x,
-              top: pos.y,
-              background: `radial-gradient(circle, ${config.color}, transparent 60%)`,
-              filter: `blur(${config.blur}px)`,
-              opacity: config.opacity
-            }}
-          />
-        );
-      })}
+      {TRAIL_CONFIG.map((config, index) => (
+        <span
+          key={index}
+          ref={el => {
+            dotsRef.current[index] = el;
+            if (el && !el.style.left) {
+              el.style.left = '-100px';
+              el.style.top = '-100px';
+            }
+          }}
+          className={`cursor-trail-dot ${hasPointerMoved ? 'visible' : ''}`}
+          style={{
+            width: config.size,
+            height: config.size,
+            background: `radial-gradient(circle, ${config.color}, transparent 60%)`,
+            filter: `blur(${config.blur}px)`,
+            opacity: 0
+          }}
+        />
+      ))}
     </div>
   );
 }

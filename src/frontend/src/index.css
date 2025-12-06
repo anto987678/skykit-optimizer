@@ -118,6 +118,22 @@ html {
   animation: pulse-border 4s ease-in-out infinite;
 }
 
+[data-reduced-motion='true'] .animate-pulse-opacity,
+[data-reduced-motion='true'] .animate-spin,
+[data-reduced-motion='true'] .animate-gradient,
+[data-reduced-motion='true'] .animate-float,
+[data-reduced-motion='true'] .animate-border-glow,
+[data-reduced-motion='true'] .float-card,
+[data-reduced-motion='true'] .flight-plane,
+[data-reduced-motion='true'] .ambient-plane {
+  animation: none !important;
+}
+
+[data-reduced-motion='true'] .air-traffic,
+[data-reduced-motion='true'] .ambient-layer {
+  display: none !important;
+}
+
 .dashboard-aurora {
   position: relative;
   overflow: hidden;

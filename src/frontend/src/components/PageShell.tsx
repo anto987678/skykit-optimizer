@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { CursorTrail } from './CursorTrail';
+import { usePerformanceMode } from '../hooks/usePerformanceMode';
 
 const planePath = 'M24 2L28.5 14H42L37 24L42 34H28.5L24 46L19.5 34H6L11 24L6 14H19.5Z';
 const trailPath = 'M4 24H16';
@@ -15,40 +16,52 @@ type PageShellProps = {
 };
 
 export function PageShell({ children }: PageShellProps) {
-  return (
-    <div className="relative min-h-screen bg-[radial-gradient(var(--color-grid)_1px,transparent_1px)] bg-[length:24px_24px] px-4 py-6 sm:px-8 lg:px-10">
-      <CursorTrail />
-      <div className="air-traffic" aria-hidden>
-        {flightPaths.map(flight => (
-          <svg
-            key={flight.id}
-            viewBox="0 0 48 48"
-            className={flight.className}
-            style={{ animationDelay: flight.delay, color: flight.color }}
-          >
-            <path d={planePath} />
-            <path d={trailPath} className="trail" />
-          </svg>
-        ))}
-      </div>
-      <div className="ambient-layer" aria-hidden>
-        <svg viewBox="0 0 48 48" className="ambient-plane ambient-plane--a">
-          <path d={planePath} />
-        </svg>
-        <svg viewBox="0 0 48 48" className="ambient-plane ambient-plane--b">
-          <path d={planePath} />
-        </svg>
-        <svg viewBox="0 0 48 48" className="ambient-plane ambient-plane--c">
-          <path d={planePath} />
-        </svg>
+  const { shouldReduceMotion } = usePerformanceMode();
+  const backgroundClass = shouldReduceMotion
+    ? 'bg-[#05060a]'
+    : 'bg-[radial-gradient(var(--color-grid)_1px,transparent_1px)] bg-[length:24px_24px]';
 
-        <svg viewBox="0 0 32 48" className="ambient-fork ambient-fork--one">
-          <path d="M12 2h2v9h2V2h2v9h2V2h2v12c0 2.2-1.8 4-4 4h-2v28h-4V18h-2c-2.2 0-4-1.8-4-4V2h2v9h2V2h2v9h2V2z" />
-        </svg>
-        <svg viewBox="0 0 32 48" className="ambient-fork ambient-fork--two">
-          <path d="M12 2h2v9h2V2h2v9h2V2h2v12c0 2.2-1.8 4-4 4h-2v28h-4V18h-2c-2.2 0-4-1.8-4-4V2h2v9h2V2h2v9h2V2z" />
-        </svg>
-      </div>
+  return (
+    <div
+      className={`relative min-h-screen ${backgroundClass} px-4 py-6 sm:px-8 lg:px-10`}
+      data-reduced-motion={shouldReduceMotion}
+    >
+      {!shouldReduceMotion && <CursorTrail />}
+      {!shouldReduceMotion && (
+        <div className="air-traffic" aria-hidden>
+          {flightPaths.map(flight => (
+            <svg
+              key={flight.id}
+              viewBox="0 0 48 48"
+              className={flight.className}
+              style={{ animationDelay: flight.delay, color: flight.color }}
+            >
+              <path d={planePath} />
+              <path d={trailPath} className="trail" />
+            </svg>
+          ))}
+        </div>
+      )}
+      {!shouldReduceMotion && (
+        <div className="ambient-layer" aria-hidden>
+          <svg viewBox="0 0 48 48" className="ambient-plane ambient-plane--a">
+            <path d={planePath} />
+          </svg>
+          <svg viewBox="0 0 48 48" className="ambient-plane ambient-plane--b">
+            <path d={planePath} />
+          </svg>
+          <svg viewBox="0 0 48 48" className="ambient-plane ambient-plane--c">
+            <path d={planePath} />
+          </svg>
+
+          <svg viewBox="0 0 32 48" className="ambient-fork ambient-fork--one">
+            <path d="M12 2h2v9h2V2h2v9h2V2h2v12c0 2.2-1.8 4-4 4h-2v28h-4V18h-2c-2.2 0-4-1.8-4-4V2h2v9h2V2h2v9h2V2z" />
+          </svg>
+          <svg viewBox="0 0 32 48" className="ambient-fork ambient-fork--two">
+            <path d="M12 2h2v9h2V2h2v9h2V2h2v12c0 2.2-1.8 4-4 4h-2v28h-4V18h-2c-2.2 0-4-1.8-4-4V2h2v9h2V2h2v9h2V2z" />
+          </svg>
+        </div>
+      )}
 
       <div className="relative z-10">
         {children}
