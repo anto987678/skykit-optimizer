@@ -46,7 +46,7 @@
 /* Base styles */
 body {
   @apply bg-bg text-text min-h-screen;
-  font-family: var(--font-family-sans);
+  font-family: var(--font-sans);
 }
 
 #root {
@@ -55,7 +55,7 @@ body {
 
 /* Animations */
 @keyframes pulse-opacity {
-  0%, 100% { opacity: 1; }
+  0%, 100% { opacity: 2; }
   50% { opacity: 0.5; }
 }
 
