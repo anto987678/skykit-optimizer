@@ -11,6 +11,7 @@ export { InventoryManager } from './inventory';
 export { DemandForecaster } from './forecasting';
 export { FlightLoader } from './flightLoader';
 export { PurchasingManager } from './purchasing';
+export { AdaptiveEngine, getAdaptiveEngine, resetAdaptiveEngine } from './adaptive';
 
 // Types and configurations
 export {

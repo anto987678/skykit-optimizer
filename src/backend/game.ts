@@ -2,6 +2,7 @@ import { ApiClient } from './api/client';
 import { HourRequestDto, HourResponseDto, PenaltyDto } from './types';
 import { loadAircraftTypes, loadAirports, getInitialStocks, loadFlightPlan } from './data/loader';
 import { GameState } from './engine/state';
+import { getAdaptiveEngine, resetAdaptiveEngine } from './engine/adaptive';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -181,6 +182,10 @@ async function main() {
   // Initialize game state with flight plan for demand forecasting
   const gameState = new GameState(initialStocks, aircraftTypes, airports, flightPlans);
 
+  // FIX 18: Reset adaptive engine for fresh learning
+  resetAdaptiveEngine();
+  console.log('[INIT] Adaptive learning engine initialized');
+
   // Initialize API client
   const client = new ApiClient();
 
@@ -229,6 +234,14 @@ async function main() {
           logPenalty(penalty, gameState);
         }
 
+        // FIX 18: Feed penalties to AdaptiveEngine for learning
+        const adaptiveEngine = getAdaptiveEngine();
+        adaptiveEngine.recordPenalties(
+          response.penalties.map(p => ({ code: p.code, penalty: p.penalty, reason: p.reason })),
+          day,
+          hour
+        );
+
         // CRITICAL: Apply purchased kits to local stock immediately
         // The server adds them instantly, so we must sync our local state
         if (purchaseOrder) {
@@ -240,8 +253,14 @@ async function main() {
         // Log progress every day at midnight
         if (hour === 0) {
           const costDelta = response.totalCost - lastCost;
-          console.log(`[DAY ${day.toString().padStart(2, '0')}] Cost: ${response.totalCost.toFixed(2)} (+${costDelta.toFixed(2)}) | Flights: ${gameState.knownFlights.size} | Departing: ${gameState.getFlightsReadyToDepart().length} | Loads sent: ${flightLoads.length}`);
+          const adaptiveSummary = adaptiveEngine.getSummary();
+          console.log(`[DAY ${day.toString().padStart(2, '0')}] Cost: ${response.totalCost.toFixed(2)} (+${costDelta.toFixed(2)}) | Flights: ${gameState.knownFlights.size} | Mode: ${adaptiveSummary.mode}`);
           lastCost = response.totalCost;
+
+          // Log adaptive state every 5 days
+          if (day % 5 === 0 && day > 0) {
+            console.log(`  [ADAPTIVE] Buffer: ${(adaptiveSummary.bufferMultiplier * 100).toFixed(0)}% | Economy boost: -${(adaptiveSummary.economyBoost * 100).toFixed(0)}% | Hot airports: ${adaptiveSummary.hotAirports.length}`);
+          }
         }
 
         // DEBUG: Extra detailed logging for days 25-29

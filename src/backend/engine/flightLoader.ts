@@ -15,6 +15,7 @@ import {
 import { LoadingConfig, DEFAULT_LOADING_CONFIG } from './types';
 import { InventoryManager } from './inventory';
 import { DemandForecaster } from './forecasting';
+import { getAdaptiveEngine } from './adaptive';
 
 export class FlightLoader {
   private inventoryManager: InventoryManager;
@@ -211,18 +212,27 @@ export class FlightLoader {
       // Don't use processingKits - server adds landed kits to stock immediately!
       const destTotal = destStock[kitClass] + destInFlight;
 
-      // FIX 15: Different buffer per kit class - Economy needs more aggressive buffer
-      // All overflows are Economy class, so we use tighter buffer for Economy
-      let bufferPercent: number;
+      // FIX 15+18: Dynamic buffer using AdaptiveEngine
+      // Base buffers per class, then adjusted by adaptive learning
+      let baseBuffer: number;
       if (flight.destinationAirport === 'HUB1') {
-        bufferPercent = 0.95;  // HUB1 can handle more
+        baseBuffer = 0.95;  // HUB1 can handle more
       } else if (kitClass === 'economy') {
-        bufferPercent = 0.70;  // 70% for Economy (most problematic - all 156 overflows)
+        baseBuffer = 0.70;  // 70% for Economy (most problematic)
       } else if (kitClass === 'premiumEconomy') {
-        bufferPercent = 0.80;  // 80% for PE (some issues historically)
+        baseBuffer = 0.80;  // 80% for PE
       } else {
-        bufferPercent = 0.85;  // 85% for First/Business (no overflow issues)
+        baseBuffer = 0.85;  // 85% for First/Business
       }
+
+      // FIX 18: Apply adaptive adjustment based on learned patterns
+      const adaptive = getAdaptiveEngine();
+      const bufferPercent = adaptive.getBufferPercent(
+        flight.destinationAirport,
+        kitClass,
+        baseBuffer
+      );
+
       const destRoom = Math.max(0, destCapacity * bufferPercent - destTotal);
 
       if (toLoad > destRoom) {
