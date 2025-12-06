@@ -58,6 +58,22 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
   const [isCompactNav, setIsCompactNav] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
 
+  // IMPORTANT: All hooks must be called before any early returns (React rules)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(max-width: 1065px)');
+    const update = () => setIsCompactNav(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!isCompactNav && isNavOpen) {
+      setIsNavOpen(false);
+    }
+  }, [isCompactNav, isNavOpen]);
+
   if (isLoading) {
     return (
       <PageShell>
@@ -183,21 +199,6 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
     'border border-[#3b82f6]/70 text-[#cfe0ff] shadow-[0_0_18px_rgba(56,189,248,0.25)] hover:border-[#7dd3fc] hover:text-white';
   const navButtonLight = 'border border-border text-text-muted hover:text-text hover:border-accent';
   const navButtonClass = `${navButtonBase} ${theme === 'dark' ? navButtonDark : navButtonLight}`;
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const media = window.matchMedia('(max-width: 1065px)');
-    const update = () => setIsCompactNav(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-
-  useEffect(() => {
-    if (!isCompactNav && isNavOpen) {
-      setIsNavOpen(false);
-    }
-  }, [isCompactNav, isNavOpen]);
 
   const toggleNav = () => setIsNavOpen(prev => !prev);
 
