@@ -7,8 +7,8 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 // Game Configuration
 export const TOTAL_ROUNDS = 720;
-export const POLL_INTERVAL_RUNNING = 1000;
-export const POLL_INTERVAL_IDLE = 2000;
+export const POLL_INTERVAL_RUNNING = 100;
+export const POLL_INTERVAL_IDLE = 1000;
 
 // UI Configuration
 export const COMPACT_NAV_BREAKPOINT = 1065;
