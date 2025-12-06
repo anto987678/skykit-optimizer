@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { GameEvent, PenaltyInfo, PenaltiesByDay } from '../hooks/useGameState';
 import type { Language } from '../hooks/useLanguage';
 import { pickLanguage } from '../i18n/utils';
@@ -28,7 +28,7 @@ const eventIcons: Record<string, string> = {
   penalty: '$'
 };
 
-export function EventsPanel({ events, penalties, penaltiesByDay, language }: EventsPanelProps) {
+function EventsPanelInner({ events, penalties, penaltiesByDay, language }: EventsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('events');
   const locale = useMemo(() => (language === 'ro' ? 'ro-RO' : 'en-US'), [language]);
   const eventsLabel = pickLanguage(language, { en: 'Events', ro: 'Evenimente' });
@@ -39,15 +39,24 @@ export function EventsPanel({ events, penalties, penaltiesByDay, language }: Eve
   const penaltyCountLabel = (count: number) => pickLanguage(language, { en: `${count} penalties`, ro: `${count} penalizări` });
   const flightLabel = pickLanguage(language, { en: 'Flight', ro: 'Zbor' });
 
-  // Calculate total penalties count from penaltiesByDay
-  const totalPenaltiesCount = penaltiesByDay
-    ? Object.values(penaltiesByDay).reduce((sum, arr) => sum + arr.length, 0)
-    : penalties.length;
+  // Memoize total penalties count
+  const totalPenaltiesCount = useMemo(() =>
+    penaltiesByDay
+      ? Object.values(penaltiesByDay).reduce((sum, arr) => sum + arr.length, 0)
+      : penalties.length,
+    [penaltiesByDay, penalties.length]
+  );
 
-  // Get sorted days (descending - newest first)
-  const sortedDays = penaltiesByDay
-    ? Object.keys(penaltiesByDay).map(Number).sort((a, b) => b - a)
-    : [];
+  // Memoize sorted days (descending - newest first)
+  const sortedDays = useMemo(() =>
+    penaltiesByDay
+      ? Object.keys(penaltiesByDay).map(Number).sort((a, b) => b - a)
+      : [],
+    [penaltiesByDay]
+  );
+
+  // Memoize reversed events to prevent re-computation
+  const reversedEvents = useMemo(() => events.slice().reverse(), [events]);
 
   // Calculate day totals
   const getDayTotal = (day: number): number => {
@@ -77,7 +86,7 @@ export function EventsPanel({ events, penalties, penaltiesByDay, language }: Eve
             {events.length === 0 ? (
               <p className="text-text-muted text-sm">{noEventsText}</p>
             ) : (
-              events.slice().reverse().map((event, index) => {
+              reversedEvents.map((event, index) => {
                 const iconType = event.type as keyof typeof badgeStyles;
                 const badgeClass = badgeStyles[iconType] || badgeStyles.flight;
                 return (
@@ -155,5 +164,8 @@ export function EventsPanel({ events, penalties, penaltiesByDay, language }: Eve
     </div>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders
+export const EventsPanel = memo(EventsPanelInner);
 
 export default EventsPanel;

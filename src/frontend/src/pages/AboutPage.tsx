@@ -224,7 +224,7 @@ export function AboutPage({ game, theme, onToggleTheme, language, onToggleLangua
         <BackToDashboardButton theme={theme} language={language} />
       </div>
 
-      <section className="relative overflow-hidden rounded-[34px] border border-border/60 bg-gradient-to-br from-bg-alt/70 via-panel/80 to-panel-dark/80 p-6 sm:p-10 space-y-10">
+      <section className="relative overflow-hidden rounded-[34px] border border-border/60 bg-linear-to-br from-bg-alt/70 via-panel/80 to-panel-dark/80 p-6 sm:p-10 space-y-10">
         <div className="pointer-events-none absolute inset-0 opacity-20 grid-overlay" />
         <div className="relative z-10 space-y-10">
           <header>
@@ -250,7 +250,7 @@ export function AboutPage({ game, theme, onToggleTheme, language, onToggleLangua
                   </article>
                 ))}
               </div>
-              <div className="rounded-[24px] border border-border/60 p-6">
+              <div className="rounded-3xl border border-border/60 p-6">
                 <p className="m-0 text-xs uppercase tracking-[0.3em] text-text-muted">{content.mottoLabel}</p>
                 <p className="text-2xl font-semibold mt-2">{content.mottoValue}</p>
               </div>
@@ -276,7 +276,7 @@ export function AboutPage({ game, theme, onToggleTheme, language, onToggleLangua
             <p className="text-xs uppercase tracking-[0.3em] text-text-muted mb-6">{content.teamLabel}</p>
             <div className="grid gap-4 md:grid-cols-3">
               {content.teamMembers.map(member => (
-                <div key={member.name} className="rounded-[24px] border border-border/50 p-5 space-y-3">
+                <div key={member.name} className="rounded-3xl border border-border/50 p-5 space-y-3">
                   <div>
                     <p className="text-lg font-semibold m-0">{member.name}</p>
                     <p className="text-text-muted text-sm m-0">{member.title}</p>

@@ -90,11 +90,12 @@ export interface UseGameStateResult {
   startGame: () => Promise<{ success: boolean; message: string }>;
 }
 
-export function useGameState(pollInterval: number = 1000): UseGameStateResult {
+export function useGameState(pollInterval: number = 2000): UseGameStateResult {
   const [state, setState] = useState<GameStateSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isTabVisible, setIsTabVisible] = useState(true);
 
   const fetchState = useCallback(async () => {
     try {
@@ -114,15 +115,28 @@ export function useGameState(pollInterval: number = 1000): UseGameStateResult {
     }
   }, []);
 
+  // Page Visibility API - pause polling when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   useEffect(() => {
     // Initial fetch
     fetchState();
 
-    // Set up polling
-    const interval = setInterval(fetchState, pollInterval);
+    // Only poll if tab is visible
+    if (!isTabVisible) return;
+
+    // Use faster polling (1s) when game is running, slower (2s) otherwise
+    const actualInterval = state?.isRunning ? 1000 : pollInterval;
+    const interval = setInterval(fetchState, actualInterval);
 
     return () => clearInterval(interval);
-  }, [fetchState, pollInterval]);
+  }, [fetchState, pollInterval, isTabVisible, state?.isRunning]);
 
   const startGame = useCallback(async (): Promise<{ success: boolean; message: string }> => {
     try {

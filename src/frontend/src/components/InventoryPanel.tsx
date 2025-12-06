@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { AirportStock } from '../hooks/useGameState';
 import type { Language } from '../hooks/useLanguage';
 import { pickLanguage } from '../i18n/utils';
@@ -8,7 +8,7 @@ interface InventoryPanelProps {
   language: Language;
 }
 
-export function InventoryPanel({ airports, language }: InventoryPanelProps) {
+function InventoryPanelInner({ airports, language }: InventoryPanelProps) {
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
   const title = pickLanguage(language, { en: 'Airport Inventory', ro: 'Inventar aeroportuar' });
   const filterLabel = pickLanguage(language, { en: 'Show only low stock', ro: 'Doar stoc critic' });
@@ -19,11 +19,13 @@ export function InventoryPanel({ airports, language }: InventoryPanelProps) {
     ro: `+${extra} aeroporturi în plus`
   });
 
-  const filteredAirports = showOnlyLowStock
-    ? airports.filter(a => a.isLowStock)
-    : airports;
+  // Memoize filtered airports to prevent re-computation on every render
+  const filteredAirports = useMemo(() =>
+    showOnlyLowStock ? airports.filter(a => a.isLowStock) : airports,
+    [airports, showOnlyLowStock]
+  );
 
-  const displayAirports = filteredAirports.slice(0, 15);
+  const displayAirports = useMemo(() => filteredAirports.slice(0, 15), [filteredAirports]);
 
   return (
     <div className="bg-panel rounded-[20px] border border-border p-6 overflow-hidden">
@@ -79,5 +81,8 @@ export function InventoryPanel({ airports, language }: InventoryPanelProps) {
     </div>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders
+export const InventoryPanel = memo(InventoryPanelInner);
 
 export default InventoryPanel;

@@ -31,12 +31,15 @@ const defaultGameState = {
     purchaseCost: 0,
     penaltyCost: 0,
     totalPenalties: 0,
-    roundsCompleted: 0
+    roundsCompleted: 0,
+    comparableScore: 0,
+    endOfGameFlightPenalty: 0
   },
   airports: [],
   activeFlights: [],
   events: [],
-  recentPenalties: []
+  recentPenalties: [],
+  penaltiesByDay: {}
 };
 
 const formatCost = (value: number): string => {
@@ -83,7 +86,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
           language={language}
           onToggleLanguage={onToggleLanguage}
         />
-        <section className="bg-gradient-to-br from-bg-alt/95 to-panel-dark/95 rounded-[34px] p-10 mb-10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02),0_30px_80px_rgba(6,6,10,0.7)]">
+        <section className="bg-linear-to-br from-bg-alt/95 to-panel-dark/95 rounded-[34px] p-10 mb-10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02),0_30px_80px_rgba(6,6,10,0.7)]">
           <div>
             <p className="uppercase tracking-[0.2em] text-xs text-text-muted mb-0.5">{t({ en: 'Connection error', ro: 'Eroare de conexiune' })}</p>
             <h2 className="mt-1 mb-6 text-4xl">{t({ en: 'Cannot connect to backend', ro: 'Nu ne putem conecta la backend' })}</h2>
@@ -120,12 +123,31 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
   const knownCostTotal = loadingCost + processingCost + penaltyCost + acquisitionCost;
   const transportCost = Math.max(0, gameState.stats.totalCost - knownCostTotal);
 
+  // FIX 26: Check for END_OF_GAME penalty to show comparable score
+  const hasEndOfGamePenalty = (gameState.stats.endOfGameFlightPenalty || 0) > 0;
+
   const metricBlocks = [
-    {
-      label: t({ en: 'Total cost', ro: 'Cost total' }),
-      value: formatCost(gameState.stats.totalCost),
-      detail: t({ en: 'Cumulative spend across the sim', ro: 'Cheltuială cumulată în simulare' })
-    },
+    // FIX 26: Show comparable score if END_OF_GAME penalty exists
+    ...(hasEndOfGamePenalty ? [
+      {
+        label: t({ en: 'Comparable Score', ro: 'Scor Comparabil' }),
+        value: formatCost(gameState.stats.comparableScore || 0),
+        detail: t({ en: 'Excludes END_OF_GAME penalty (same for all)', ro: 'Exclude penalitatea END_OF_GAME (identică pentru toți)' }),
+        isHighlight: true
+      },
+      {
+        label: t({ en: 'Total (incl. END_OF_GAME)', ro: 'Total (cu END_OF_GAME)' }),
+        value: formatCost(gameState.stats.totalCost),
+        detail: t({ en: 'Includes unavoidable penalty', ro: 'Include penalitate inevitabilă' }),
+        isMuted: true
+      }
+    ] : [
+      {
+        label: t({ en: 'Total cost', ro: 'Cost total' }),
+        value: formatCost(gameState.stats.totalCost),
+        detail: t({ en: 'Cumulative spend across the sim', ro: 'Cheltuială cumulată în simulare' })
+      }
+    ]),
     {
       label: t({ en: 'Penalties', ro: 'Penalizări' }),
       value: formatCost(penaltyCost),
@@ -222,7 +244,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
           {isNavOpen && (
             <div
               id="dashboard-mobile-nav"
-              className="mt-4 flex flex-col gap-3 rounded-[28px] border border-border/70 bg-gradient-to-br from-panel-dark/80 to-panel/80 p-4 shadow-[0_25px_60px_rgba(5,6,10,0.5)]"
+              className="mt-4 flex flex-col gap-3 rounded-[28px] border border-border/70 bg-linear-to-br from-panel-dark/80 to-panel/80 p-4 shadow-[0_25px_60px_rgba(5,6,10,0.5)]"
             >
               {navLinks.map(link => (
                 <Link
@@ -240,7 +262,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-[34px] border border-border/70 bg-gradient-to-br from-bg-alt/70 via-panel/80 to-panel-dark/80 p-6 sm:p-10 mb-12 dashboard-aurora">
+      <section className="relative overflow-hidden rounded-[34px] border border-border/70 bg-linear-to-br from-bg-alt/70 via-panel/80 to-panel-dark/80 p-6 sm:p-10 mb-12 dashboard-aurora">
         <div className="pointer-events-none absolute inset-0 opacity-40 grid-overlay animate-float" />
         <div className="pointer-events-none absolute -top-28 -right-24 h-72 w-72 bg-accent/20 blur-[120px] animate-gradient" />
         <div className="pointer-events-none absolute -bottom-16 -left-10 h-64 w-64 bg-accent-2/25 blur-[120px] animate-gradient" />
@@ -273,7 +295,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
               </div>
             </div>
 
-            <div className="glass-card float-card rounded-[24px] px-6 py-5 w-full max-w-sm">
+            <div className="glass-card float-card rounded-3xl px-6 py-5 w-full max-w-sm">
               <p className="uppercase tracking-[0.3em] text-xs text-text-muted mb-3">{t({ en: 'Connection', ro: 'Conexiune' })}</p>
               <div className="flex items-center gap-3">
                 <span className={`h-3 w-3 rounded-full ${isConnected ? 'bg-success shadow-[0_0_14px_rgba(74,223,134,0.7)]' : 'bg-danger shadow-[0_0_14px_rgba(255,90,95,0.5)]'}`} />
@@ -286,7 +308,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            <div className="glass-card float-card rounded-[24px] p-6 border border-border/70">
+            <div className="glass-card float-card rounded-3xl p-6 border border-border/70">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs uppercase tracking-[0.3em] text-text-muted">{t({ en: 'Status', ro: 'Stare' })}</p>
                 <span className="text-sm font-mono text-text-muted">{t({ en: `Round ${gameState.stats.roundsCompleted} / 720`, ro: `Runda ${gameState.stats.roundsCompleted} / 720` })}</span>
@@ -302,7 +324,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
               </p>
               <div className="relative h-2 rounded-full bg-border">
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-accent via-accent-2 to-warning animate-gradient"
+                  className="absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-accent via-accent-2 to-warning animate-gradient"
                   style={{ width: `${progress * 100}%` }}
                 />
               </div>
@@ -311,7 +333,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
               </p>
             </div>
 
-            <div className="glass-card float-card rounded-[24px] p-6 border border-border/70 space-y-4">
+            <div className="glass-card float-card rounded-3xl p-6 border border-border/70 space-y-4">
               <p className="text-xs uppercase tracking-[0.3em] text-text-muted">{t({ en: 'Insights', ro: 'Perspective' })}</p>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
@@ -329,7 +351,7 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
               </div>
             </div>
 
-            <div className="glass-card float-card rounded-[24px] p-6 border border-border/70">
+            <div className="glass-card float-card rounded-3xl p-6 border border-border/70">
               <p className="text-xs uppercase tracking-[0.3em] text-text-muted mb-5">{t({ en: 'Timeline', ro: 'Cronologie' })}</p>
               <div className="space-y-4">
                 {[{ label: t({ en: 'Morning sort', ro: 'Sortare matinală' }), time: '08:00', active: gameState.hour < 12 }, { label: t({ en: 'Peak ops', ro: 'Vârf operațional' }), time: '16:00', active: gameState.hour >= 12 && gameState.hour < 20 }, { label: t({ en: 'Overnight recovery', ro: 'Recuperare de noapte' }), time: '23:00', active: gameState.hour >= 20 || gameState.hour < 5 }].map(stage => (
@@ -351,17 +373,33 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
               {metricBlocks.map(metric => (
                 <div
                   key={metric.label}
-                  className="glass-card float-card rounded-[22px] p-5 border border-border/60 flex items-center justify-between backdrop-blur-xl"
+                  className={`glass-card float-card rounded-[22px] p-5 border flex items-center justify-between backdrop-blur-xl ${
+                    metric.isHighlight
+                      ? 'border-green-500/50 bg-green-500/5'
+                      : metric.isMuted
+                        ? 'border-border/40 opacity-60'
+                        : 'border-border/60'
+                  }`}
                 >
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-text-muted">{metric.label}</p>
-                    <p className="text-2xl font-semibold mt-1">{metric.value}</p>
+                    <p className={`text-2xl font-semibold mt-1 ${
+                      metric.isHighlight
+                        ? 'text-green-400'
+                        : metric.isMuted
+                          ? 'text-text-muted text-xl'
+                          : ''
+                    }`}>{metric.value}</p>
                     {metric.detail && (
                       <p className="text-xs text-text-muted mt-1 tracking-[0.15em] uppercase">{metric.detail}</p>
                     )}
                   </div>
-                  <span className="h-12 w-12 rounded-full border border-border/50 flex items-center justify-center text-sm text-text-muted">
-                    •
+                  <span className={`h-12 w-12 rounded-full border flex items-center justify-center text-sm ${
+                    metric.isHighlight
+                      ? 'border-green-500/50 text-green-400'
+                      : 'border-border/50 text-text-muted'
+                  }`}>
+                    {metric.isHighlight ? '✓' : '•'}
                   </span>
                 </div>
               ))}
