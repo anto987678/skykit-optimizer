@@ -267,6 +267,29 @@ export class GameState {
     return this.inventoryManager.getProcessingKits();
   }
 
+  // ==================== COST TRACKING ====================
+
+  /**
+   * Get cumulative transport cost (loading kits onto flights)
+   */
+  getTransportCost(): number {
+    return this.inventoryManager.getTransportCost();
+  }
+
+  /**
+   * Get cumulative processing cost (processing kits at airports)
+   */
+  getProcessingCost(): number {
+    return this.inventoryManager.getProcessingCost();
+  }
+
+  /**
+   * Reset cost tracking (useful for new game)
+   */
+  resetCosts(): void {
+    this.inventoryManager.resetCosts();
+  }
+
   // ==================== DEBUG ====================
 
   /**

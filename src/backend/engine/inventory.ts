@@ -25,6 +25,10 @@ export class InventoryManager {
   // Track kits being processed at airports (not yet available)
   private processingKits: ProcessingKits[] = [];
 
+  // Cumulative cost tracking for frontend display
+  private cumulativeTransportCost: number = 0;
+  private cumulativeProcessingCost: number = 0;
+
   constructor(
     initialStocks: Map<string, PerClassAmount>,
     airports: Map<string, Airport>
@@ -53,6 +57,21 @@ export class InventoryManager {
 
   getAllStocks(): Map<string, PerClassAmount> {
     return this.airportStocks;
+  }
+
+  // ==================== COST TRACKING ====================
+
+  getTransportCost(): number {
+    return this.cumulativeTransportCost;
+  }
+
+  getProcessingCost(): number {
+    return this.cumulativeProcessingCost;
+  }
+
+  resetCosts(): void {
+    this.cumulativeTransportCost = 0;
+    this.cumulativeProcessingCost = 0;
   }
 
   // ==================== IN-FLIGHT TRACKING ====================
@@ -107,6 +126,7 @@ export class InventoryManager {
   /**
    * Deduct kits from airport stock
    * Returns true if successful, false if would go negative
+   * Also tracks transport/loading cost
    */
   deductStock(airportCode: string, kitClass: keyof PerClassAmount, amount: number): boolean {
     const stock = this.airportStocks.get(airportCode);
@@ -118,6 +138,13 @@ export class InventoryManager {
     }
 
     stock[kitClass] -= amount;
+
+    // Track transport/loading cost
+    const airport = this.airports.get(airportCode);
+    if (airport && amount > 0) {
+      this.cumulativeTransportCost += airport.loadingCost[kitClass] * amount;
+    }
+
     return true;
   }
 
@@ -221,16 +248,28 @@ export class InventoryManager {
             const capacity = airport.capacity[kitClass];
             const toAdd = Math.min(inflight.kits[kitClass], capacity - stock[kitClass]);
             stock[kitClass] += Math.max(0, toAdd);
+
+            // Track processing cost
+            if (inflight.kits[kitClass] > 0) {
+              this.cumulativeProcessingCost += airport.processingCost[kitClass] * inflight.kits[kitClass];
+            }
           }
         }
       } else {
-        // Queue for processing
+        // Queue for processing - cost will be tracked when processing completes
         this.processingKits.push({
           airportCode: event.destinationAirport,
           kits: copyPerClass(inflight.kits),
           readyDay,
           readyHour
         });
+
+        // Track processing cost now (when kits enter processing)
+        for (const kitClass of KIT_CLASSES) {
+          if (inflight.kits[kitClass] > 0) {
+            this.cumulativeProcessingCost += airport.processingCost[kitClass] * inflight.kits[kitClass];
+          }
+        }
       }
     } else {
       // Airport not found - add directly

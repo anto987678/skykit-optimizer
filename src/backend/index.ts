@@ -191,9 +191,10 @@ function writePenaltyLogs() {
     byAirport,
     unfulfilledByDistance,
     topUnfulfilledFlights: unfulfilledFlights.sort((a, b) => b.penalty - a.penalty).slice(0, 20),
-    inventoryExceedsCapacity: penaltyLogs.filter(p => p.code === 'INVENTORY_EXCEEDS_CAPACITY'),
-    flightUnfulfilled: penaltyLogs.filter(p => p.code.includes('UNFULFILLED')),
-    otherPenaltiesSample: penaltyLogs.filter(p => p.code !== 'INVENTORY_EXCEEDS_CAPACITY' && !p.code.includes('UNFULFILLED')).slice(0, 50)
+    // FIX 21: Reduce log size - only keep samples instead of ALL penalties
+    overflowSample: penaltyLogs.filter(p => p.code === 'INVENTORY_EXCEEDS_CAPACITY').slice(0, 10),
+    unfulfilledSample: penaltyLogs.filter(p => p.code.includes('UNFULFILLED')).slice(0, 10),
+    otherPenaltiesSample: penaltyLogs.filter(p => p.code !== 'INVENTORY_EXCEEDS_CAPACITY' && !p.code.includes('UNFULFILLED')).slice(0, 10)
   };
 
   fs.writeFileSync(logFile, JSON.stringify(output, null, 2));
@@ -352,6 +353,8 @@ async function runGame() {
         const roundNum = day * 24 + hour + 1;
         updateStats({
           totalCost: response.totalCost,
+          transportCost: gameState.getTransportCost(),
+          processingCost: gameState.getProcessingCost(),
           penaltyCost: response.penalties.reduce((sum, p) => sum + p.penalty, 0),
           totalPenalties: response.penalties.length,
           roundsCompleted: roundNum
