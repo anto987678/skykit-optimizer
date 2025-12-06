@@ -2,6 +2,7 @@ import { ApiClient } from './api/client';
 import { HourRequestDto, HourResponseDto, PenaltyDto } from './types';
 import { loadAircraftTypes, loadAirports, getInitialStocks, loadFlightPlan } from './data/loader';
 import { GameState } from './engine/state';
+import { calculateDynamicPurchaseConfig, calculateDynamicLoadingConfig } from './engine/types';
 import { getAdaptiveEngine, resetAdaptiveEngine } from './engine/adaptive';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -179,8 +180,26 @@ async function main() {
   const initialStocks = getInitialStocks(airports);
   const flightPlans = loadFlightPlan();
 
+  // Calculate dynamic config based on HUB1 capacity
+  const hub = airports.get('HUB1');
+  const purchaseConfig = hub ? calculateDynamicPurchaseConfig(hub.capacity) : undefined;
+  const loadingConfig = hub ? calculateDynamicLoadingConfig(hub.capacity) : undefined;
+
+  // Log data characteristics for debugging on new datasets
+  if (hub) {
+    console.log('=== DATA CHARACTERISTICS ===');
+    console.log(`Hub capacity: FC=${hub.capacity.first}, BC=${hub.capacity.business}, PE=${hub.capacity.premiumEconomy}, EC=${hub.capacity.economy}`);
+    console.log(`Airports: ${airports.size} (1 hub + ${airports.size - 1} spokes)`);
+    console.log(`Aircraft types: ${aircraftTypes.size}`);
+    console.log(`Flight routes: ${flightPlans.length}`);
+    if (purchaseConfig) {
+      console.log(`Dynamic thresholds: FC=${purchaseConfig.thresholds.first}, BC=${purchaseConfig.thresholds.business}, PE=${purchaseConfig.thresholds.premiumEconomy}, EC=${purchaseConfig.thresholds.economy}`);
+    }
+    console.log('============================\n');
+  }
+
   // Initialize game state with flight plan for demand forecasting
-  const gameState = new GameState(initialStocks, aircraftTypes, airports, flightPlans);
+  const gameState = new GameState(initialStocks, aircraftTypes, airports, flightPlans, purchaseConfig, loadingConfig);
 
   // FIX 18: Reset adaptive engine for fresh learning
   resetAdaptiveEngine();

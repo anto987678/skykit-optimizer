@@ -119,6 +119,12 @@ export class GameState {
       // Always update/store the flight info
       this.knownFlights.set(event.flightId, event);
 
+      // Record observed passenger counts for adaptive demand forecasting
+      // This helps estimate demand on new datasets with different passenger distributions
+      if (event.eventType === 'SCHEDULED' || event.eventType === 'CHECKED_IN') {
+        this.demandForecaster.recordObservedDemand(event.passengers);
+      }
+
       if (event.eventType === 'LANDED') {
         // Flight landed - process via inventory manager
         this.inventoryManager.processLandedFlight(event);

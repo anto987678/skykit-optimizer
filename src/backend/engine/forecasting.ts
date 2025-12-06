@@ -13,8 +13,69 @@ import {
 export class DemandForecaster {
   private flightPlans: FlightPlan[];
 
+  // Track observed passenger counts for adaptive demand estimation
+  private observedDemands: Record<keyof PerClassAmount, number[]> = {
+    first: [],
+    business: [],
+    premiumEconomy: [],
+    economy: []
+  };
+
+  // Cached averages (updated when new observations added)
+  private cachedAverages: Record<keyof PerClassAmount, number> | null = null;
+
   constructor(flightPlans: FlightPlan[]) {
     this.flightPlans = flightPlans;
+  }
+
+  /**
+   * Record observed passenger counts from actual flights (for adaptive learning)
+   * Call this when SCHEDULED or CHECKED_IN events are received
+   */
+  recordObservedDemand(passengers: PerClassAmount): void {
+    for (const kitClass of KIT_CLASSES) {
+      const count = passengers[kitClass];
+      if (count > 0) {
+        this.observedDemands[kitClass].push(count);
+        // Keep only last 100 observations per class
+        if (this.observedDemands[kitClass].length > 100) {
+          this.observedDemands[kitClass].shift();
+        }
+      }
+    }
+    // Invalidate cache
+    this.cachedAverages = null;
+  }
+
+  /**
+   * Get dynamic demand estimate based on observed flights
+   * Falls back to conservative hardcoded values if not enough data
+   */
+  private getDynamicDemandEstimate(kitClass: keyof PerClassAmount): number {
+    const observations = this.observedDemands[kitClass];
+
+    // Need at least 5 observations for meaningful average
+    if (observations.length >= 5) {
+      // Use cached average if available
+      if (!this.cachedAverages) {
+        this.cachedAverages = {
+          first: this.calculateAverage(this.observedDemands.first),
+          business: this.calculateAverage(this.observedDemands.business),
+          premiumEconomy: this.calculateAverage(this.observedDemands.premiumEconomy),
+          economy: this.calculateAverage(this.observedDemands.economy)
+        };
+      }
+      // Return average with 30% buffer
+      return Math.ceil(this.cachedAverages[kitClass] * 1.3);
+    }
+
+    // Fall back to conservative hardcoded values
+    return this.getTypicalDemandEstimate(kitClass);
+  }
+
+  private calculateAverage(arr: number[]): number {
+    if (arr.length === 0) return 0;
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
   }
 
   /**
@@ -58,8 +119,8 @@ export class DemandForecaster {
         if (plan.departCode === airportCode &&
             plan.scheduledHour === checkHour &&
             plan.weekdays[weekdayIndex]) {
-          // Estimate demand based on typical load
-          const estimate = this.getTypicalDemandEstimate(kitClass);
+          // Estimate demand based on observed data (or typical load as fallback)
+          const estimate = this.getDynamicDemandEstimate(kitClass);
           demand += estimate;
         }
       }
@@ -121,9 +182,9 @@ export class DemandForecaster {
         if (plan.departCode === airportCode &&
             plan.scheduledHour === checkHour &&
             plan.weekdays[weekdayIndex]) {
-          // Estimate passengers based on typical aircraft capacity
+          // Estimate passengers based on observed data (or typical capacity as fallback)
           for (const kitClass of KIT_CLASSES) {
-            demand[kitClass] += this.getTypicalDemandEstimate(kitClass);
+            demand[kitClass] += this.getDynamicDemandEstimate(kitClass);
           }
         }
       }

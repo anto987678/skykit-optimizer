@@ -66,25 +66,89 @@ export interface LoadingConfig {
   enableReturnToHub: boolean;
 }
 
-// Default configurations
+/**
+ * Calculate dynamic purchase config based on hub capacity
+ * This ensures thresholds scale properly with different datasets
+ */
+export function calculateDynamicPurchaseConfig(hubCapacity: PerClassAmount): PurchaseConfig {
+  return {
+    // Thresholds as percentage of hub capacity - OPTIMIZED based on penalty analysis
+    thresholds: {
+      first: Math.floor(hubCapacity.first * 0.20),           // 20% - was 10%, First deficit from Day 7
+      business: Math.floor(hubCapacity.business * 0.40),     // 40% - was 33%, 822 penalties
+      premiumEconomy: Math.floor(hubCapacity.premiumEconomy * 0.55), // 55% - was 40%, 1961 penalties (most!)
+      economy: Math.floor(hubCapacity.economy * 0.75)        // 75% - was 70%, 1309 penalties
+    },
+    // Emergency thresholds - increased for early-game protection
+    emergencyThresholds: {
+      first: Math.max(50, Math.floor(hubCapacity.first * 0.05)),      // 5% - was 2%
+      business: Math.max(200, Math.floor(hubCapacity.business * 0.03)),
+      premiumEconomy: Math.max(50, Math.floor(hubCapacity.premiumEconomy * 0.05)), // 5% - was 2%
+      economy: Math.max(1000, Math.floor(hubCapacity.economy * 0.10))
+    },
+    // Max per order - increased for faster stock building
+    maxPerOrder: {
+      first: Math.max(100, Math.floor(hubCapacity.first * 0.08)),      // 8% - was 5%
+      business: Math.max(500, Math.floor(hubCapacity.business * 0.15)),
+      premiumEconomy: Math.max(100, Math.floor(hubCapacity.premiumEconomy * 0.15)), // 15% - was 10%
+      economy: Math.max(2000, Math.floor(hubCapacity.economy * 0.15))
+    },
+    // Max total - 3x capacity (for entire 30 days)
+    maxTotalPurchase: {
+      first: hubCapacity.first * 3,
+      business: hubCapacity.business * 3,
+      premiumEconomy: hubCapacity.premiumEconomy * 3,
+      economy: hubCapacity.economy * 3
+    },
+    // API limits - keep as-is (server constraints)
+    apiLimits: {
+      first: 42000,
+      business: 42000,
+      premiumEconomy: 3000,
+      economy: 42000
+    },
+    purchaseInterval: 6,
+    demandBuffer: 1.0,
+    forecastHours: 48
+  };
+}
+
+/**
+ * Calculate dynamic loading config based on hub capacity
+ */
+export function calculateDynamicLoadingConfig(hubCapacity: PerClassAmount): LoadingConfig {
+  // Safety buffer as percentage (1% hub, 3% spoke) - will be applied per airport
+  // Here we just store base values, actual calculation happens in flightLoader
+  return {
+    safetyBuffer: {
+      hub: 0.01,   // 1% of capacity (will be multiplied by actual capacity)
+      spoke: 0.03  // 3% of capacity
+    },
+    destinationForecastHours: 24,
+    enableExtraLoadingToSpokes: true,
+    enableReturnToHub: true
+  };
+}
+
+// Default configurations (fallback if hub capacity not available)
 export const DEFAULT_PURCHASE_CONFIG: PurchaseConfig = {
   thresholds: {
-    first: 1800,        // FIX 23: Was 1200, increased to reduce UNFULFILLED
+    first: 1800,
     business: 6000,
-    premiumEconomy: 4000,  // FIX 23: Was 2500, increased to reduce UNFULFILLED
-    economy: 70000         // FIX 23: Was 50000, increased to reduce UNFULFILLED (51% of penalties!)
+    premiumEconomy: 4000,
+    economy: 70000
   },
   emergencyThresholds: {
-    first: 400,         // FIX 8: Was 300, increased
+    first: 400,
     business: 2000,
-    premiumEconomy: 400,   // FIX 8: Was 300, increased
+    premiumEconomy: 400,
     economy: 10000
   },
   maxPerOrder: {
-    first: 1000,        // FIX 23: Was 700, increased to reduce UNFULFILLED
+    first: 1000,
     business: 3000,
-    premiumEconomy: 1000,  // FIX 23: Was 700, increased to reduce UNFULFILLED
-    economy: 15000         // FIX 23: Was 10000, increased to reduce UNFULFILLED
+    premiumEconomy: 1000,
+    economy: 15000
   },
   maxTotalPurchase: {
     first: 50000,
@@ -95,20 +159,20 @@ export const DEFAULT_PURCHASE_CONFIG: PurchaseConfig = {
   apiLimits: {
     first: 42000,
     business: 42000,
-    premiumEconomy: 3000,  // FIX 1.2: Was 1000, aligned with threshold to prevent burst purchases
+    premiumEconomy: 3000,
     economy: 42000
   },
   purchaseInterval: 6,
-  demandBuffer: 1.0,  // FIX 1.1: Was 1.1, reduced to prevent over-purchasing
+  demandBuffer: 1.0,
   forecastHours: 48
 };
 
 export const DEFAULT_LOADING_CONFIG: LoadingConfig = {
   safetyBuffer: {
-    hub: 100,
+    hub: 100,    // Fallback absolute values
     spoke: 20
   },
-  destinationForecastHours: 24,  // FIX 2.1: Was 48, reduced to prevent spoke overflow
+  destinationForecastHours: 24,
   enableExtraLoadingToSpokes: true,
   enableReturnToHub: true
 };

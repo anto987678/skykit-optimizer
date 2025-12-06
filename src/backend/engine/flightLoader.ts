@@ -195,10 +195,22 @@ export class FlightLoader {
     const rawAvailable = originStock[kitClass];
 
     // Safety buffer to avoid negative inventory
-    // EARLY-GAME: Use larger buffer (500) to protect HUB1 stock
+    // Calculate buffer as percentage of airport capacity for robustness on different datasets
     const isHub = flight.originAirport === 'HUB1';
-    const baseBuffer = isHub ? this.config.safetyBuffer.hub : this.config.safetyBuffer.spoke;
-    const safetyBuffer = isHub && isEarlyGame ? 500 : baseBuffer;
+    const originAirport = this.inventoryManager.getAirport(flight.originAirport);
+    const airportCapacity = originAirport ? originAirport.capacity[kitClass] : 1000; // fallback
+
+    // safetyBuffer.hub/spoke are now percentages (0.01, 0.03) or absolute values (100, 20)
+    // Check if they look like percentages (< 1) or absolute values
+    const bufferConfig = isHub ? this.config.safetyBuffer.hub : this.config.safetyBuffer.spoke;
+    const isPercentage = bufferConfig < 1;
+    const baseBuffer = isPercentage
+      ? Math.max(5, Math.floor(airportCapacity * bufferConfig))  // percentage of capacity
+      : bufferConfig;  // absolute value (backwards compatible)
+
+    // EARLY-GAME: Use larger buffer (5% of capacity or 500 min) to protect HUB1 stock
+    const earlyGameBuffer = Math.max(500, Math.floor(airportCapacity * 0.05));
+    const safetyBuffer = isHub && isEarlyGame ? earlyGameBuffer : baseBuffer;
     const available = Math.max(0, rawAvailable - safetyBuffer);
     const capacity = aircraft.kitCapacity[kitClass];
 
