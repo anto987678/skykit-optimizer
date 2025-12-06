@@ -3,6 +3,7 @@ import { PageShell } from '../components/PageShell';
 import { SiteHeader } from '../components/SiteHeader';
 import { BackToDashboardButton } from '../components/BackToDashboardButton';
 import type { UseGameStateResult } from '../hooks/useGameState';
+import { useEventHistory, usePenaltyHistory } from '../hooks/useGameState';
 import type { Theme } from '../hooks/useTheme';
 import type { Language } from '../hooks/useLanguage';
 import { pickLanguage } from '../i18n/utils';
@@ -16,10 +17,11 @@ type EventsPageProps = {
 };
 
 export function EventsPage({ game, theme, onToggleTheme, language, onToggleLanguage }: EventsPageProps) {
-  const { state, isLoading, error, isConnected } = game;
-  const events = state?.events || [];
-  const penalties = state?.recentPenalties || [];
-  const penaltiesByDay = state?.penaltiesByDay || {};
+  const { isLoading, error, isConnected } = game;
+  // Fetch events and penalties separately with same polling rate (1s)
+  const { events } = useEventHistory(1000);
+  const { penaltiesByDay } = usePenaltyHistory(1000);
+  const penalties = Object.values(penaltiesByDay).flat().slice(-20);
   const t = <T,>(values: { en: T; ro: T }) => pickLanguage(language, values);
 
   return (

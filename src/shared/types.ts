@@ -58,6 +58,7 @@ export interface GameStats {
   purchaseCost: number;
   penaltyCost: number;
   totalPenalties: number;
+  totalEvents: number;
   roundsCompleted: number;
   // FIX 25: Comparable score (excluding END_OF_GAME_UNFULFILLED_FLIGHT_KITS)
   comparableScore: number;
@@ -90,6 +91,6 @@ export interface GameStateSnapshot {
   // Recent penalties (last 20)
   recentPenalties: PenaltyInfo[];
 
-  // ALL penalties grouped by day
-  penaltiesByDay: PenaltiesByDay;
+  // ALL penalties grouped by day (optional - fetched separately via /api/penalties/history)
+  penaltiesByDay?: PenaltiesByDay;
 }

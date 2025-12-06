@@ -33,6 +33,7 @@ const defaultGameState = {
     purchaseCost: 0,
     penaltyCost: 0,
     totalPenalties: 0,
+    totalEvents: 0,
     roundsCompleted: 0,
     comparableScore: 0,
     endOfGameFlightPenalty: 0
@@ -340,11 +341,11 @@ export function HomePage({ game, theme, onToggleTheme, language, onToggleLanguag
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-text-muted text-sm">{t({ en: 'Events logged', ro: 'Evenimente înregistrate' })}</span>
-                  <strong className="text-lg">{gameState.events.length}</strong>
+                  <strong className="text-lg">{gameState.stats.totalEvents}</strong>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-text-muted text-sm">{t({ en: 'Recent penalties', ro: 'Penalizări recente' })}</span>
-                  <strong className="text-lg">{gameState.recentPenalties.length}</strong>
+                  <span className="text-text-muted text-sm">{t({ en: 'Total penalties', ro: 'Total penalizări' })}</span>
+                  <strong className="text-lg">{gameState.stats.totalPenalties}</strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-text-muted text-sm">{t({ en: 'Avg cost / round', ro: 'Cost mediu / rundă' })}</span>

@@ -23,11 +23,13 @@ let currentStats: GameStats = {
   purchaseCost: 0,
   penaltyCost: 0,
   totalPenalties: 0,
+  totalEvents: 0,
   roundsCompleted: 0,
   comparableScore: 0,
   endOfGameFlightPenalty: 0
 };
 let recentEvents: GameEvent[] = [];
+let allEvents: GameEvent[] = [];  // ALL events for history view
 let recentPenalties: PenaltyInfo[] = [];
 let penaltiesByDay: PenaltiesByDay = {};  // ALL penalties grouped by day
 let isGameRunning = false;
@@ -59,8 +61,7 @@ app.get('/api/state', (_req: Request, res: Response) => {
       airports: [],
       activeFlights: [],
       events: recentEvents,
-      recentPenalties: [],
-      penaltiesByDay: penaltiesByDay
+      recentPenalties: []
     } as GameStateSnapshot);
     return;
   }
@@ -76,8 +77,7 @@ app.get('/api/state', (_req: Request, res: Response) => {
     airports: getAirportStocks(),
     activeFlights: getActiveFlights(),
     events: recentEvents,
-    recentPenalties: recentPenalties,
-    penaltiesByDay: penaltiesByDay
+    recentPenalties: recentPenalties
   };
 
   res.json(snapshot);
@@ -93,14 +93,24 @@ app.get('/api/stats', (_req: Request, res: Response) => {
   res.json(currentStats);
 });
 
-// Get just events
+// Get just events (recent 50)
 app.get('/api/events', (_req: Request, res: Response) => {
   res.json(recentEvents);
 });
 
-// Get just penalties
+// Get all events (for history view)
+app.get('/api/events/history', (_req: Request, res: Response) => {
+  res.json(allEvents);
+});
+
+// Get just penalties (recent)
 app.get('/api/penalties', (_req: Request, res: Response) => {
   res.json(recentPenalties);
+});
+
+// Get all penalties grouped by day (for history view)
+app.get('/api/penalties/history', (_req: Request, res: Response) => {
+  res.json(penaltiesByDay);
 });
 
 // Helper: Convert game state airports to API format
@@ -218,13 +228,23 @@ export function updateStats(stats: Partial<GameStats>): void {
 }
 
 export function addEvent(event: GameEvent): void {
+  currentStats.totalEvents++;  // Track total count
+  allEvents.push(event);  // Store ALL events for history view
   recentEvents.push(event);
+  // Keep only the last 50 events for real-time display
+  if (recentEvents.length > 50) {
+    recentEvents.shift();
+  }
 }
 
 export function addPenalty(penalty: PenaltyInfo): void {
   recentPenalties.push(penalty);
+  // Keep only the last 20 penalties for real-time display
+  if (recentPenalties.length > 20) {
+    recentPenalties.shift();
+  }
 
-  // Also store in penaltiesByDay
+  // Store ALL penalties in penaltiesByDay for history view
   const day = penalty.issuedDay;
   if (!penaltiesByDay[day]) {
     penaltiesByDay[day] = [];
@@ -242,6 +262,7 @@ export function setGameComplete(complete: boolean): void {
 
 export function clearState(): void {
   recentEvents = [];
+  allEvents = [];  // Reset all events
   recentPenalties = [];
   penaltiesByDay = {};  // Reset all penalties by day
   currentStats = {
@@ -251,6 +272,7 @@ export function clearState(): void {
     purchaseCost: 0,
     penaltyCost: 0,
     totalPenalties: 0,
+    totalEvents: 0,
     roundsCompleted: 0,
     comparableScore: 0,
     endOfGameFlightPenalty: 0

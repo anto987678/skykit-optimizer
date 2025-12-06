@@ -60,6 +60,7 @@ export interface GameStats {
   purchaseCost: number;
   penaltyCost: number;
   totalPenalties: number;
+  totalEvents: number;
   roundsCompleted: number;
   comparableScore: number;
   endOfGameFlightPenalty: number;
@@ -77,7 +78,7 @@ export interface GameStateSnapshot {
   activeFlights: FlightInfo[];
   events: GameEvent[];
   recentPenalties: PenaltyInfo[];
-  penaltiesByDay: PenaltiesByDay;
+  penaltiesByDay?: PenaltiesByDay;
 }
 
 export interface UseGameStateResult {
@@ -194,3 +195,103 @@ export function useGameState(pollInterval: number = 2000): UseGameStateResult {
 }
 
 export default useGameState;
+
+// Separate hook for penalty history (slower polling, only used on Events page)
+export interface UsePenaltyHistoryResult {
+  penaltiesByDay: PenaltiesByDay;
+  isLoading: boolean;
+  error: string | null;
+}
+
+// Separate hook for event history (slower polling, only used on Events page)
+export interface UseEventHistoryResult {
+  events: GameEvent[];
+  isLoading: boolean;
+  error: string | null;
+}
+
+export function useEventHistory(pollInterval: number = 1000): UseEventHistoryResult {
+  const [events, setEvents] = useState<GameEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/events/history`);
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      const data: GameEvent[] = await response.json();
+      setEvents(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch events');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Page Visibility API - pause polling when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    fetchEvents();
+
+    if (!isTabVisible) return;
+
+    const interval = setInterval(fetchEvents, pollInterval);
+    return () => clearInterval(interval);
+  }, [fetchEvents, pollInterval, isTabVisible]);
+
+  return { events, isLoading, error };
+}
+
+export function usePenaltyHistory(pollInterval: number = 1000): UsePenaltyHistoryResult {
+  const [penaltiesByDay, setPenaltiesByDay] = useState<PenaltiesByDay>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/penalties/history`);
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      const data: PenaltiesByDay = await response.json();
+      setPenaltiesByDay(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch penalty history');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Page Visibility API - pause polling when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+
+    if (!isTabVisible) return;
+
+    const interval = setInterval(fetchHistory, pollInterval);
+    return () => clearInterval(interval);
+  }, [fetchHistory, pollInterval, isTabVisible]);
+
+  return { penaltiesByDay, isLoading, error };
+}
