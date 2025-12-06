@@ -360,13 +360,6 @@ export class GameState {
   }
 
   /**
-   * Debug: print current stocks
-   */
-  printStocks(): void {
-    this.inventoryManager.printStocks();
-  }
-
-  /**
    * Get airport data (for logging)
    */
   getAirport(airportCode: string): Airport | undefined {

@@ -332,18 +332,4 @@ export class InventoryManager {
 
     return result;
   }
-
-  // ==================== DEBUG ====================
-
-  printStocks(): void {
-    console.log('\n[INVENTORY] Current stocks:');
-    for (const [code, stock] of this.airportStocks) {
-      const total = stock.first + stock.business + stock.premiumEconomy + stock.economy;
-      if (total > 0 || code === 'HUB1') {
-        console.log(`  ${code}: FC=${stock.first}, BC=${stock.business}, PE=${stock.premiumEconomy}, EC=${stock.economy}`);
-      }
-    }
-    console.log(`  In-flight: ${this.inFlightKits.size} flights`);
-    console.log(`  Processing: ${this.processingKits.length} batches`);
-  }
 }

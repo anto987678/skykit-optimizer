@@ -1,8 +1,10 @@
 import { ApiClient } from './api/client';
-import { HourRequestDto, HourResponseDto, PenaltyDto } from './types';
+import { HourRequestDto, HourResponseDto, PenaltyDto, PerClassAmount, KIT_CLASSES } from './types';
 import { loadAircraftTypes, loadAirports, getInitialStocks, loadFlightPlan } from './data/loader';
 import { GameState } from './engine/state';
 import { calculateDynamicPurchaseConfig, calculateDynamicLoadingConfig } from './engine/types';
+import { problemLogger } from './engine/problemLogger';
+import { getAdaptiveEngine, resetAdaptiveEngine } from './engine/adaptive';
 import {
   startServer,
   registerGameCallback,
@@ -292,6 +294,12 @@ async function runGame() {
   setGameState(gameState, airports);
   clearState();
 
+  // Reset problem logger for new simulation
+  problemLogger.reset();
+
+  // Reset adaptive engine for new simulation
+  resetAdaptiveEngine();
+
   // Initialize API client
   const client = new ApiClient();
 
@@ -329,6 +337,14 @@ async function runGame() {
             });
             // Log to file for analysis
             logPenaltyToFile(penalty, gameState);
+          }
+
+          // Feed penalties to AdaptiveEngine for real-time learning
+          if (previousResponse.penalties.length > 0) {
+            getAdaptiveEngine().recordPenalties(
+              previousResponse.penalties.map(p => ({ code: p.code, penalty: p.penalty, reason: p.reason })),
+              day, hour
+            );
           }
 
           // Add flight events for frontend
@@ -399,49 +415,28 @@ async function runGame() {
           const costDelta = response.totalCost - lastCost;
           console.log(`[DAY ${day.toString().padStart(2, '0')}] Cost: ${response.totalCost.toFixed(2)} (+${costDelta.toFixed(2)}) | Flights: ${gameState.knownFlights.size} | Departing: ${gameState.getFlightsReadyToDepart().length} | Loads sent: ${flightLoads.length}`);
           lastCost = response.totalCost;
-        }
 
-        // DEBUG: Extra detailed logging for days 25-29
-        if (day >= 25) {
-          console.log(`[DEBUG D${day}H${hour}] Cost: $${(response.totalCost / 1000000).toFixed(2)}M | Penalties: ${response.penalties.length} | Loads sent: ${flightLoads.length}`);
-
-          // Log what we loaded
-          if (flightLoads.length > 0) {
-            let totalEC = 0;
-            for (const load of flightLoads) {
-              totalEC += load.loadedKits.economy;
-            }
-            console.log(`  [DEBUG] Total economy kits loaded this round: ${totalEC}`);
-          }
-
-          // Group penalties by type
-          if (response.penalties.length > 0) {
-            const byType: Record<string, { count: number; total: number }> = {};
-            for (const p of response.penalties) {
-              if (!byType[p.code]) byType[p.code] = { count: 0, total: 0 };
-              byType[p.code].count++;
-              byType[p.code].total += p.penalty;
-            }
-            for (const [code, data] of Object.entries(byType)) {
-              console.log(`  [DEBUG] ${code}: ${data.count}x = $${(data.total / 1000000).toFixed(2)}M`);
+          // End-game status check (D25+)
+          if (day >= 25) {
+            const hubStock = gameState.getStock('HUB1');
+            if (hubStock) {
+              // Calculate spoke totals
+              const spokeTotal: PerClassAmount = { first: 0, business: 0, premiumEconomy: 0, economy: 0 };
+              for (const [code, stock] of gameState.airportStocks) {
+                if (code !== 'HUB1') {
+                  for (const kitClass of KIT_CLASSES) {
+                    spokeTotal[kitClass] += stock[kitClass];
+                  }
+                }
+              }
+              // Calculate in-flight to HUB
+              const inFlightToHub: PerClassAmount = { first: 0, business: 0, premiumEconomy: 0, economy: 0 };
+              for (const kitClass of KIT_CLASSES) {
+                inFlightToHub[kitClass] = gameState.getInFlightKitsToAirport('HUB1', kitClass);
+              }
+              problemLogger.endGameStatus(day, hubStock, spokeTotal, inFlightToHub);
             }
           }
-
-          // Log hub stock for economy
-          const hubStock = gameState.getStock('HUB1');
-          if (hubStock) {
-            console.log(`  [DEBUG] HUB1 stock: EC=${hubStock.economy}, PE=${hubStock.premiumEconomy}, BC=${hubStock.business}, FC=${hubStock.first}`);
-          }
-        }
-
-        // Log penalties (limit to avoid spam) - only for days < 25
-        if (day < 25 && response.penalties.length > 0 && response.penalties.length <= 5) {
-          for (const penalty of response.penalties) {
-            console.log(`  [PENALTY] ${penalty.code}: ${penalty.penalty.toFixed(2)}`);
-          }
-        } else if (day < 25 && response.penalties.length > 5) {
-          const total = response.penalties.reduce((sum, p) => sum + p.penalty, 0);
-          console.log(`  [PENALTIES] ${response.penalties.length} penalties, total: ${total.toFixed(2)}`);
         }
       }
     }
@@ -511,6 +506,9 @@ async function runGame() {
 
     // Write detailed penalty logs to file
     writePenaltyLogs();
+
+    // Print problem summary (doar dacă au fost probleme)
+    problemLogger.printSummary();
 
   } catch (error) {
     console.error('\n[ERROR] Game failed:', error);

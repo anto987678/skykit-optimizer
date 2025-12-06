@@ -16,6 +16,7 @@ import { LoadingConfig, DEFAULT_LOADING_CONFIG } from './types';
 import { InventoryManager } from './inventory';
 import { DemandForecaster } from './forecasting';
 import { getAdaptiveEngine } from './adaptive';
+import { problemLogger } from './problemLogger';
 
 export class FlightLoader {
   private inventoryManager: InventoryManager;
@@ -163,12 +164,6 @@ export class FlightLoader {
       flight.arrival.hour
     );
 
-    // Debug logging for end-game
-    const totalLoaded = loadedKits.first + loadedKits.business + loadedKits.premiumEconomy + loadedKits.economy;
-    if (totalLoaded > 0 && currentDay >= 25) {
-      console.log(`  [LOAD] Flight ${flight.flightNumber} ${flight.originAirport}→${flight.destinationAirport}: EC=${loadedKits.economy}, BC=${loadedKits.business}, PE=${loadedKits.premiumEconomy}, FC=${loadedKits.first}`);
-    }
-
     return {
       flightId: flight.flightId,
       loadedKits
@@ -250,6 +245,14 @@ export class FlightLoader {
       const destRoom = Math.max(0, destCapacity * bufferPercent - destTotal);
 
       if (toLoad > destRoom) {
+        // Log overflow warning doar dacă destination aproape de capacity
+        const expectedTotal = destTotal + toLoad;
+        problemLogger.warnOverflow(
+          { day: currentDay, hour: currentHour, airport: flight.destinationAirport, kitClass },
+          destStock[kitClass],
+          expectedTotal,
+          destCapacity
+        );
         toLoad = Math.max(0, destRoom);
       }
     }

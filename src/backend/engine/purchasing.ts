@@ -12,6 +12,7 @@ import {
 import { PurchaseConfig, DEFAULT_PURCHASE_CONFIG } from './types';
 import { InventoryManager } from './inventory';
 import { DemandForecaster } from './forecasting';
+import { problemLogger } from './problemLogger';
 
 // Kit costs from hackitall2025 API specification
 const KIT_COSTS: Record<keyof PerClassAmount, number> = {
@@ -82,6 +83,13 @@ export class PurchasingManager {
       // FIX 10: Skip if not enough time for kit to arrive before game ends
       const leadTime = LEAD_TIMES[kitClass];
       if (hoursRemaining < leadTime) {
+        // Log deadline info o singură dată per clasă
+        problemLogger.infoDeadline(
+          { day: currentDay, hour: currentHour },
+          kitClass,
+          hoursRemaining,
+          leadTime
+        );
         continue;  // Kit won't arrive in time
       }
 
@@ -131,7 +139,6 @@ export class PurchasingManager {
 
     // Skip if no room available
     if (maxRoom <= 0) {
-      console.log(`[PURCHASE SKIP] Day ${currentDay} Hour ${currentHour}: No room for ${kitClass} (stock=${currentStock}, purchased=${alreadyPurchased}, capacity=${capacity})`);
       return 0;
     }
 
@@ -161,7 +168,6 @@ export class PurchasingManager {
       const burstAmount = Math.min(maxPerOrder * 2, maxToBuy, apiLimit, maxRoom); // Double the normal order
 
       if (burstAmount > 0) {
-        console.log(`[PURCHASE END-GAME BURST] Day ${currentDay} Hour ${currentHour}: Ordering ${burstAmount} ${kitClass} kits (${hoursRemaining}h remaining, lead time ${leadTime}h)`);
         return burstAmount;
       }
     }
@@ -172,13 +178,11 @@ export class PurchasingManager {
 
     if (isEarlyGame) {
       // Day 0-2: Purchase at EVERY HOUR if below 50% capacity
-      // FIX 1.3: Was 70%, reduced to prevent HUB1 overflow for First/PE classes
       if (currentStock < capacity * 0.5) {
         const maxToBuy = maxTotalPurchase - this.totalPurchased[kitClass];
         const earlyGameAmount = Math.min(maxPerOrder, maxToBuy, apiLimit, maxRoom);
 
         if (earlyGameAmount > 0) {
-          console.log(`[PURCHASE EARLY-GAME] Day ${currentDay} Hour ${currentHour}: Ordering ${earlyGameAmount} ${kitClass} kits (stock=${currentStock}, capacity=${capacity})`);
           return earlyGameAmount;
         }
       }
@@ -187,11 +191,17 @@ export class PurchasingManager {
 
     // EMERGENCY MODE: If stock is critically low, purchase immediately
     if (currentStock < emergencyThreshold) {
+      // Log low stock warning (o dată pe zi per clasă)
+      problemLogger.warnLowStock(
+        { day: currentDay, hour: currentHour, kitClass },
+        currentStock,
+        emergencyThreshold
+      );
+
       const maxToBuy = maxTotalPurchase - this.totalPurchased[kitClass];
       const emergencyAmount = Math.min(threshold, maxToBuy, apiLimit, maxRoom);
 
       if (emergencyAmount > 0) {
-        console.log(`[PURCHASE EMERGENCY] Day ${currentDay} Hour ${currentHour}: Ordering ${emergencyAmount} ${kitClass} kits (stock was ${currentStock}, room: ${maxRoom})`);
         return emergencyAmount;
       }
       return 0;
@@ -226,7 +236,6 @@ export class PurchasingManager {
     const toPurchase = Math.min(deficit, maxPerOrder, maxToBuy, apiLimit, maxRoom);
 
     if (toPurchase > 100) {
-      console.log(`[PURCHASE] Day ${currentDay} Hour ${currentHour}: Ordering ${toPurchase} ${kitClass} kits (expected: ${totalExpected}, demand: ${demand}, room: ${maxRoom})`);
       return toPurchase;
     }
 
@@ -243,10 +252,7 @@ export class PurchasingManager {
 
     for (const kitClass of KIT_CLASSES) {
       if (order[kitClass] > 0) {
-        const added = this.inventoryManager.addStock('HUB1', kitClass, order[kitClass]);
-        if (added > 0) {
-          console.log(`[STOCK UPDATE] Applied ${added} ${kitClass} kits to HUB1 (now: ${hubStock[kitClass]})`);
-        }
+        this.inventoryManager.addStock('HUB1', kitClass, order[kitClass]);
       }
     }
   }
